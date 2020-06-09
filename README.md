@@ -9,3 +9,6 @@
  then create a model object, adding the layers to the model using model.add()
  
  All operations are done on a data structure called Matrix. Source code provided
+ To run the code, use these commands
+ g++ -o output.exe dump.cpp
+ ./output.exe
