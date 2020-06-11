@@ -7,12 +7,25 @@
 using namespace std;
 enum LAYER {linear, relu, sigmoid};
 
+
+//This is the parent abstract class, each class must have these 5 functions to qualify as a layer
 class Layer{
     public:
-    string name="name", taip="taip";
+    string name,taip;//="name", taip="taip";
 
     //virtual ~Layer() {}
     //make these virtual
+    virtual Matrix forward(Matrix& A) = 0;
+
+    virtual Matrix backward(Matrix& A) = 0;
+
+    virtual void step(float alpha) = 0;
+
+    virtual string get_name() = 0;
+
+    virtual string get_taip() = 0;
+    
+    /*
     virtual void forward(){
         cout<<"In the wrong place, this is the placeholder forward"<<endl;
         return;
@@ -27,13 +40,25 @@ class Layer{
         cout<<"In the wrong place, this is the placeholder step"<<endl;
         return;
     }
+    */
 };
 
+
+//Dense layer
 class Linear: public Layer{
     public:
     //make static constant
-    int d_out, d_in, bias, A_is_initialized=0;
-    Matrix W, dW, dA, A;
+    /*
+    d_out:size of layer
+    d_in: size of the last dimension of the previous layer
+    bias: whether(1) or not(0) a bias term is used
+    W,dW: Weights and gradients of weights
+    A,dA: input to the layer, used for backpropagation
+    b,db: bias term and its gradient
+
+    */
+    int d_out, d_in, bias;
+    Matrix W, dW, dA, A, b, db;
     string taip = "Dense Layer", name;
     //Linear(){
 
@@ -41,14 +66,11 @@ class Linear: public Layer{
     
 
     //d_out is the dimension of the hidden layer, d_in is the dimension of the previosu layer
+    //initializer
     Linear(int d_out, int d_in, string name, int bias=1){
         if(bias!=0 && bias!=1){
             cout<<"Invalid value for bias";
             return;
-        }
-        if(bias==1){
-            d_in+=1;
-            //cout<<"din";
         }
         this->name = name;
         this->d_out = d_out;
@@ -57,47 +79,55 @@ class Linear: public Layer{
         this->W =  Matrix(d_in, d_out);
         this->dW = Matrix(d_in, d_out);
         this->W.rand_init();
+        this->b = Matrix(1,d_out);
+        this->db = Matrix(1,d_out);
         //W.print();
     }
 
-    Matrix forward(Matrix A){
-        if((A.w!=W.h && bias==0) || (A.w+1!=W.h && bias==1)){
+    string get_name(){
+        return this->name;
+    }
+    string get_taip(){
+        return this->taip;
+    }
+
+    Matrix forward(Matrix& A){
+        if(A.w!=W.h){
             
             cout<<endl<<"input and weight dimensions do not match for product ("<<A.h<<","<<A.w<<") ("<<W.h<<","<<W.w<<") Layer "<<name<<endl;
             exit(1);
         }
-        //this->A = Matrix(A.h, A.w);
-        if(bias==1){
-            A = A.add_bias_col();
-        }
+
         this->A = A;
-        //A.print();
-        //W.print();
-        //cout<<"Once";
-        return  A.matmul(this->W);
+        Matrix output = A.matmul(this->W);
+        if(this->bias==1){output = output.bias_add(this->b);}
+        return  output;
         
     }
 
-    Matrix backward(Matrix dY){
-        //make sure this isn't incorrect
-        //(this->A).transpose().print();
+    Matrix backward(Matrix& dY){
         //dY.print();
         this->dW = (this->A.transpose()).matmul(dY);
-        this->dA = Matrix(this->A.h, this->A.w);
+        if(this->bias==1){this->db = dY.reduce_axis_0();}
         this->dA = dY.matmul((this->dW.transpose()));
         return this->dA;
     }
 
     void step(float alpha){
-        this->W = this->W.diff(dW.scalar_mul(alpha));
+        //dW.print();
+        this->W = this->W.diff(this->dW.scalar_mul(alpha));
+        if(bias==1){this->b = this->b.diff(this->db.scalar_mul(alpha));}
 
     }
 };
 
 class ReLU: public Layer{
     public:
+    /*
+    Z: The input to the layer, used for backpropagation 
+    */
     string taip = "ReLU Activation", name;
-    Matrix W, dW, Z;
+    Matrix Z;
 
     ReLU(){
         string name = "default ReLU";
@@ -120,7 +150,7 @@ class ReLU: public Layer{
         }
     }
 
-    Matrix ReLU_op(Matrix X){
+    Matrix ReLU_op(Matrix &X){
         Matrix temp = Matrix(X.h, X.w);
         for(int i=0;i<X.h;i++){
             for(int j=0;j<X.w;j++){
@@ -140,7 +170,7 @@ class ReLU: public Layer{
         }
     }
 
-    Matrix ReLU_back_op(Matrix X){
+    Matrix ReLU_back_op(Matrix &X){
         Matrix temp = Matrix(X.h, X.w);
         for(int i=0;i<X.h;i++){
             for(int j=0;j<X.w;j++){
@@ -151,27 +181,34 @@ class ReLU: public Layer{
     }
 
 
-    Matrix forward(Matrix X){
+    Matrix forward(Matrix &X){
         this->Z = Matrix(X.h, X.w);
         this->Z = X;
-        //cout<<"RELU"<<endl;
-        //X.print();
-        //ReLU_op(X).print();
-        //cout<<"RELU"<<endl;
         return ReLU_op(X);
     }
 
-    Matrix backward(Matrix dY){
-        
+    Matrix backward(Matrix &dY){
         return dY.hadamard(ReLU_back_op(this->Z));
+    }
+
+    void step(float alpha){}
+
+    string get_name(){
+        return this->name;
+    }
+    string get_taip(){
+        return this->taip;
     }
 
 };
 
 class Sigmoid: public Layer{
     public:
+    /*
+    Z: the input to the layer used for backpropagation
+    */
     string taip = "SIGMOID Activation", name;
-    Matrix W, dW, Z;
+    Matrix Z;
 
     Sigmoid(){
         string name = "default Sigmoid";
@@ -185,10 +222,11 @@ class Sigmoid: public Layer{
 
     
     double sigmoid_single(double x){
-        return 1.d/(1 + exp(-x));
+        //cout<<1.d/(1 + exp(-x))<<endl;
+        return exp(x)/(1 + exp(x));
     }
 
-    Matrix sigmoid_op(Matrix X){
+    Matrix sigmoid_op(Matrix &X){
         Matrix temp = Matrix(X.h, X.w);
         for(int i=0;i<X.h;i++){
             for(int j=0;j<X.w;j++){
@@ -198,11 +236,13 @@ class Sigmoid: public Layer{
     return temp;
     }
 
+
     double sigmoid_back_single(double x){
         return sigmoid_single(x)*(1-sigmoid_single(x));
     }
 
-    Matrix sigmoid_back_op(Matrix X){
+
+    Matrix sigmoid_back_op(Matrix &X){
         Matrix temp = Matrix(X.h, X.w);
         for(int i=0;i<X.h;i++){
             for(int j=0;j<X.w;j++){
@@ -213,19 +253,23 @@ class Sigmoid: public Layer{
     }
 
 
-    Matrix forward(Matrix X){
+    Matrix forward(Matrix& X){
         this->Z = Matrix(X.h, X.w);
         this->Z = X;
-        //cout<<"RELU"<<endl;
-        //X.print();
-        //ReLU_op(X).print();
-        //cout<<"RELU"<<endl;
         return sigmoid_op(X);
     }
 
-    Matrix backward(Matrix dY){
-        
+    Matrix backward(Matrix& dY){
         return dY.hadamard(sigmoid_back_op(this->Z));
+    }
+
+    void step(float alpha){}
+
+    string get_name(){
+        return this->name;
+    }
+    string get_taip(){
+        return this->taip;
     }
 
 };

@@ -3,101 +3,137 @@
 #include "matrix.h"
 #include "loss.h"
 #include "model.h"
+#include "io.h"
 #include<typeinfo>
-
+#include "utils.h"
 using namespace std;
 
 
-int main(){
-    int x=0;
-    float arr[1][4][5];
-    for(int i=0;i<1;i++){
-        for(int j=0;j<4;j++){
-            for(int k=0;k<5;k++){
-                arr[i][j][k] = x++;
-                //cout<<arr[i][j][k];
 
-            }
+
+int main(){
+    string filename = "diabetes.csv";
+    pair<Matrix, Matrix> PAIR = read_csv(filename);
+    Matrix input = PAIR.first;
+    Matrix y = PAIR.second;
+    //cout<<y.h<<" "<<y.w<<" "<<endl;
+    input = input.ms_normalise();
+
+    int flag = check_ground_truth(y);
+    if(flag==1){
+        cout<<"Ground truth failed the check";
+        return 1;
+    }
+
+
+    
+    Matrix t1 = Matrix(1000,1);
+    //Matrix t2 = Matrix(2,3);
+    Matrix t3 = Matrix(10,10);
+    Matrix ttt = Matrix(1,10);
+    ttt.init(1.d);
+    //t1.rand_init(2);
+    //t1 = t1.ms_normalise();
+    //t1.print();
+    cout<<"steven";
+    for(int i=0;i<y.h;i++){
+        for(int j=0;j<y.w;j++){
+            y.elements[i][j] = double(y.elements[i][j]);
         }
     }
-    Matrix t1 = Matrix(10,1);
-    Matrix t2 = Matrix(2,3);
-    Matrix t3 = Matrix(10,1);
-    
+    //y.print();
+    //t3.rand_init(0);
+
+    //t3.print();
     int ctr=1;
     int c2r=1;
-    for(int i=0;i<t1.h;i++){
-        for(int j=0;j<t1.w;j++){
-            t1.elements[i][j]=ctr++;
+    for(int i=0;i<t3.h;i++){
+        for(int j=0;j<t3.w;j++){
+           t3.elements[i][j]=(double)ctr++;
+            //t1.elements[i][j]=ctr++;
             //t2.elements[i][j]=5;
 
         }
     }
-    for(int i=0;i<t3.h;i++){
-        for(int j=0;j<t3.w;j++){
-            t3.elements[i][j]=c2r++;
-
-        }
-    }
-    Matrix t4(400,1);
-    t4.init(4.d);
-    t4 = t4.scalar_mul(1.d);
+    //t3 = t3.bias_add(ttt);
+    //t3.print();
+    //t3.clip(10,19).print();
+    //t3.reduce_axis_0().print();
+    //t3 = t3.ms_normalise();
+    //t3.calc_std().print();
+    //t3.print();
+    //Matrix m2 = t3.calc_means();
+    //m2.print();
+    //for(int i=0;i<t3.h;i++){
+    //    t3.elements[i][0]=0.d;
+    //    t3.elements[i][1]=1.d;
+    //
+    //}
+    //t1.print();
+    //cout<<"ma";
+    //Matrix t4(400,1);
+    //t4.init(4.d);
+    //t4 = t4.scalar_mul(1.d);
     //t4 = t4.power(2);
-    Matrix t5 = Matrix(400,1);
-    t5.init(5.d);
+    //Matrix t5 = Matrix(400,1);
+    //t5.init(5.d);
     //t1.diff(t3);
     //(t4.diff(t5)).print();
     //Matrix s = t1.matmul(t3);
     //t1.print();
+    
+    //t3.init(0);
+    
     //Matrix s = t1.hadamard(t3);
     //double red = t2.sum_reduce();
     //cout<<"reduce sum: "<<red<<endl;
-    t3.init(0);
+
     //t4.print();
     //print_matrix(t1);
     //print_matrix(t3);
     //print_matrix(s);
 
+    
 
     Linear *W1,*W2,*W3;
-    Linear Lx=Linear(1,1,"W1",1);
-    Linear Ly=Linear(5,4,"W2",0);
-    Linear Lz=Linear(1,5,"W3",0);
-
-    W1 = &Lx;
-    W2 = &Ly;
-    W3 = &Lz;
+    W1 = new Linear(500,input.w,"W1",1);
+    W2 = new Linear(120,500,"W2",1);
+    W3 = new Linear(1,120,"W3",1);
 
     ReLU *r1,*r2,*r3;
-    ReLU lx=ReLU("Default ReLU");
-    ReLU ly = ReLU("D2R2");
-    ReLU lz = ReLU("D3R3");
+    //ReLU lx=ReLU("Default ReLU");
+    //ReLU ly = ReLU("D2R2");
+    //ReLU lz = ReLU("D3R3");
 
-    r1 = &lx;
-    r2 = &ly;
-    r3 = &lz;
+    r1 = new ReLU("Default ReLU");
+    r2 = new ReLU("D2R2");
+    //r3 = new ReLU("D3R3");
     
-    Sigmoid *s1;
-    Sigmoid ls = Sigmoid("Only sigmoid");
-    s1 = &ls;
-    
-    //(y.W).print();
+    Sigmoid *s1, *s2;
+    s1 = new Sigmoid("Only sigmoid");
+    //s2 = new Sigmoid("Only sigmoid");
+
     Model m = Model();
-    m.add(W1, linear);
-    //m.add(r1, relu);
-    //m.add(W2, linear);
-    //m.add(r2, relu);
-    //m.add(W3, linear);
-    //m.add(r3, relu);
-    m.add(s1,sigmoid);
-    //cout<<typeid(W4).name();
-    m.print_model();
-    int temp;cin>>temp;
-    MSE_Loss L1 = MSE_Loss();
-    m.train(t1,t3,0.001,10000,L1, 1);
-
+    m.add(W1);
+    m.add(r1);
+    m.add(W2);
+    m.add(r2);
+    m.add(W3);
+    //m.add(r3);
+    m.add(s1);
     
+    MSE_Loss *L1 = new MSE_Loss();
+
+    //W1->W.print();
+    //Matrix temp1 = W1->forward(input);
+    //temp1 = r1->forward(temp1);
+    //temp1 = W2->forward(temp1);
+    //Matrix t22 = L1->compute(temp1,t1);
+    
+    //temp1.print();
+    //m.train(t1,t1,0.01,100000,L1, 0);
+    
+    m.train(input,y,0.001,100000,L1, 1, 1);
     
     return 0;
 }
-
