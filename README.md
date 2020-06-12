@@ -9,7 +9,7 @@
  then create a model object, adding the layers to the model using model.add()
  
  All operations are done on a data structure called Matrix. Source code provided
- To run the code, use these commands called from the directory where dump.cpp is stored (all the files need to be in the same directory)
+ To run the test code, use these commands called from the directory where dump.cpp is stored (all the files need to be in the same directory). It runs a 2 layer network on 1000x2 datapoints for binary classification
  
  g++ -o output.exe dump.cpp
  
