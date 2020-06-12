@@ -14,7 +14,7 @@ class Layer{
     string name,taip;//="name", taip="taip";
 
     //virtual ~Layer() {}
-    //make these virtual
+
     virtual Matrix forward(Matrix& A) = 0;
 
     virtual Matrix backward(Matrix& A) = 0;
@@ -25,35 +25,20 @@ class Layer{
 
     virtual string get_taip() = 0;
     
-    /*
-    virtual void forward(){
-        cout<<"In the wrong place, this is the placeholder forward"<<endl;
-        return;
-    }
 
-    virtual void backward(){
-        cout<<"In the wrong place, this is the placeholder backward"<<endl;
-        return;
-    }
-
-    virtual void step(){
-        cout<<"In the wrong place, this is the placeholder step"<<endl;
-        return;
-    }
-    */
 };
 
 
 //Dense layer
 class Linear: public Layer{
     public:
-    //make static constant
+
     /*
     d_out:size of layer
     d_in: size of the last dimension of the previous layer
     bias: whether(1) or not(0) a bias term is used
     W,dW: Weights and gradients of weights
-    A,dA: input to the layer, used for backpropagation
+    A,dA: input to the layer, itsgradient, used for backpropagation
     b,db: bias term and its gradient
 
     */
@@ -92,6 +77,15 @@ class Linear: public Layer{
     }
 
     Matrix forward(Matrix& A){
+        /*
+        computes forward pass
+        input
+        A: input from previous layer
+
+        returns
+        output = A*W;
+        */
+
         if(A.w!=W.h){
             
             cout<<endl<<"input and weight dimensions do not match for product ("<<A.h<<","<<A.w<<") ("<<W.h<<","<<W.w<<") Layer "<<name<<endl;
@@ -106,6 +100,13 @@ class Linear: public Layer{
     }
 
     Matrix backward(Matrix& dY){
+        /*
+        computes backward pass
+        input:
+        dY: gradient of the next layer
+
+        returns: gradient of what was the input to this layer
+        */
         //dY.print();
         this->dW = (this->A.transpose()).matmul(dY);
         if(this->bias==1){this->db = dY.reduce_axis_0();}
@@ -141,40 +142,57 @@ class ReLU: public Layer{
 
     
     double relu_single(double x){
+        /*
+        Performs ReLU on a single input, used by ReLU op
+        */
 
         if(x>=0){
             return x;
         }
         else{
-            return 0.d;
+            return 0.0;
         }
     }
 
     Matrix ReLU_op(Matrix &X){
+        /*
+        Performs ReLU on a matrix
+        input
+        X: inputs to the layer
+
+        returns
+        temp: ReLU on the input
+        */
         Matrix temp = Matrix(X.h, X.w);
         for(int i=0;i<X.h;i++){
             for(int j=0;j<X.w;j++){
-                temp.elements[i][j] = relu_single(X.elements[i][j]);
+                temp.elements[temp.w*i + j] = relu_single(X.elements[X.w*i + j]);
             }
         }
     return temp;
     }
 
     double relu_back_single(double x){
+        /*
+        Performs ReLU back op on a single input. Used by ReLU back op()
+        */
 
         if(x>=0){
-            return 1.d;
+            return 1.0;
         }
         else{
-            return 0.d;
+            return 0.0;
         }
     }
 
     Matrix ReLU_back_op(Matrix &X){
+        /*
+        Performs ReLU backward op on a matrix
+        */
         Matrix temp = Matrix(X.h, X.w);
         for(int i=0;i<X.h;i++){
             for(int j=0;j<X.w;j++){
-                temp.elements[i][j] = relu_back_single(X.elements[i][j]);
+                temp.elements[temp.w*i + j] = relu_back_single(X.elements[X.w*i + j]);
             }
         }
     return temp;
@@ -182,21 +200,42 @@ class ReLU: public Layer{
 
 
     Matrix forward(Matrix &X){
+        /*
+        forward pass
+        input
+        X: output of the previous layer
+
+        returns
+        ReLU(X)
+        */
         this->Z = Matrix(X.h, X.w);
         this->Z = X;
         return ReLU_op(X);
     }
 
     Matrix backward(Matrix &dY){
+        /*
+        Backward pass over ReLU
+        input:
+        gradient of previous layer
+
+        returns: for each number, returns the number if the number is greater than 0 else 0
+        */
         return dY.hadamard(ReLU_back_op(this->Z));
     }
 
     void step(float alpha){}
 
     string get_name(){
+        /*
+        get the layer's name
+        */
         return this->name;
     }
     string get_taip(){
+        /*
+        get the layer's type
+        */
         return this->taip;
     }
 
@@ -222,15 +261,22 @@ class Sigmoid: public Layer{
 
     
     double sigmoid_single(double x){
+        /*
+        Perform sigmoid operation over a single number, used by sigmoid_op()
+        */
         //cout<<1.d/(1 + exp(-x))<<endl;
         return exp(x)/(1 + exp(x));
     }
 
     Matrix sigmoid_op(Matrix &X){
+        /*
+        Perform sigmoid operation over a matrix
+        returns the sigmoid of X
+        */
         Matrix temp = Matrix(X.h, X.w);
         for(int i=0;i<X.h;i++){
             for(int j=0;j<X.w;j++){
-                temp.elements[i][j] = sigmoid_single(X.elements[i][j]);
+                temp.elements[temp.w*i + j] = sigmoid_single(X.elements[X.w*i + j]);
             }
         }
     return temp;
@@ -238,15 +284,21 @@ class Sigmoid: public Layer{
 
 
     double sigmoid_back_single(double x){
+        /*
+        sigmoid backprop over a single element. Used by sigmoid_back_prop().
+        */
         return sigmoid_single(x)*(1-sigmoid_single(x));
     }
 
 
     Matrix sigmoid_back_op(Matrix &X){
+        /*
+        Performs sigmoid back op over a matrix
+        */
         Matrix temp = Matrix(X.h, X.w);
         for(int i=0;i<X.h;i++){
             for(int j=0;j<X.w;j++){
-                temp.elements[i][j] = sigmoid_back_single(X.elements[i][j]);
+                temp.elements[temp.w*i + j] = sigmoid_back_single(X.elements[X.w*i + j]);
             }
         }
     return temp;
@@ -254,21 +306,44 @@ class Sigmoid: public Layer{
 
 
     Matrix forward(Matrix& X){
+        /*
+        forward pass
+
+        input
+        X: output of the previous layer
+
+        returns
+        sigmoid_op(X)
+        */
         this->Z = Matrix(X.h, X.w);
         this->Z = X;
         return sigmoid_op(X);
     }
 
     Matrix backward(Matrix& dY){
+        /*
+        backward pass
+
+        input: the gradient from the next layer
+
+        returns:
+        elementwise product between the gradient and the sigmoid of what was the input to sigmoid during forward pass 
+        */
         return dY.hadamard(sigmoid_back_op(this->Z));
     }
 
     void step(float alpha){}
 
     string get_name(){
+        /*
+        get name
+        */
         return this->name;
     }
     string get_taip(){
+        /*
+        get type
+        */
         return this->taip;
     }
 
